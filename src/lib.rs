@@ -1,10 +1,16 @@
 // official ref
 // https://invent.kde.org/plasma/kwin/-/blob/master/src/utils/svgcursorreader.cpp?ref_type=heads
 
+use resvg::{
+	tiny_skia::Pixmap,
+	usvg::{Transform, Tree},
+};
+use serde::Deserialize;
 use std::{
 	borrow::Cow,
 	collections::HashMap,
-	path::PathBuf,
+	fmt::Debug,
+	path::{Path, PathBuf},
 	sync::{Arc, LazyLock},
 };
 
@@ -203,4 +209,129 @@ fn theme_inherits(path: PathBuf) -> Option<String> {
 pub enum CursorIcon {
 	Svg { path: PathBuf },
 	X { path: PathBuf },
+}
+
+impl CursorIcon {
+	pub fn frames(&self, size: u32) -> Option<Vec<Frame>> {
+		match self {
+			CursorIcon::Svg { path } => {
+				let metadata = path.join("metadata.json");
+				let metadata = std::fs::read_to_string(metadata).ok()?;
+				let metadata = serde_json::from_str::<Vec<Meta>>(&metadata).ok()?;
+
+				if metadata.is_empty() {
+					return None;
+				}
+
+				let images = metadata
+					.into_iter()
+					.map(|meta| Frame::render_svg(path, size, meta));
+
+				Some(images.collect())
+			}
+			CursorIcon::X { path } => {
+				let content = std::fs::read(path).ok()?;
+				let images = xcursor::parser::parse_xcursor(&content)?;
+				if images.is_empty() {
+					return None;
+				}
+
+				let nearest = images
+					.iter()
+					.min_by_key(|img| u32::abs_diff(img.size, size))
+					.unwrap();
+				let nearest_size = nearest.size;
+
+				let frames = images
+					.into_iter()
+					.filter(|img| img.size == nearest_size)
+					.map(Frame::from_xcursor)
+					.collect();
+				Some(frames)
+			}
+		}
+	}
+}
+
+pub struct Frame {
+	pub size: u32,
+
+	pub xhot: u32,
+	pub yhot: u32,
+
+	pub delay: Option<u32>,
+
+	/// pixels in rgba format
+	pub pixels: Vec<u8>,
+}
+
+impl Debug for Frame {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		f.debug_struct("Frame")
+			.field("size", &self.size)
+			.field("xhot", &self.xhot)
+			.field("yhot", &self.yhot)
+			.field("delay", &self.delay)
+			.field("pixels", &[&..])
+			.finish()
+	}
+}
+
+impl Frame {
+	fn from_xcursor(xcursor: xcursor::parser::Image) -> Self {
+		Frame {
+			size: xcursor.size,
+
+			xhot: xcursor.xhot,
+			yhot: xcursor.yhot,
+
+			delay: Some(xcursor.delay),
+
+			pixels: xcursor.pixels_rgba,
+		}
+	}
+
+	fn render_svg(path: &Path, size: u32, meta: Meta) -> Self {
+		let usvg_opts = resvg::usvg::Options::default();
+
+		let data = path.join(meta.filename);
+		let data = std::fs::read(data).unwrap();
+
+		let tree = Tree::from_data(&data, &usvg_opts).unwrap();
+		let transform = Transform::from_scale(
+			size as f32 / tree.size().height(),
+			size as f32 / tree.size().width(),
+		);
+
+		let scale = size as f32 / meta.nominal_size;
+		let (xhot, yhot) = (meta.hotspot_x * scale, meta.hotspot_y * scale);
+
+		let mut pixmap = Pixmap::new(size, size).unwrap();
+		resvg::render(&tree, transform, &mut pixmap.as_mut());
+
+		let pixels = pixmap.take();
+
+		Frame {
+			size,
+
+			xhot: xhot as u32,
+			yhot: yhot as u32,
+
+			delay: meta.delay,
+
+			pixels,
+		}
+	}
+}
+
+#[derive(Debug, Deserialize)]
+struct Meta {
+	filename: String,
+
+	hotspot_x: f32,
+	hotspot_y: f32,
+	nominal_size: f32,
+
+	#[serde(default)]
+	delay: Option<u32>,
 }

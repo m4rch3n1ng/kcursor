@@ -4,4 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+resvg = { version = "0.44.0", default-features = false }
+serde = { version = "1.0.210", features = ["derive"] }
+serde_json = "1.0.128"
 xcursor = "0.3.8"
+
+[dev-dependencies]
+png = "0.17.14"
