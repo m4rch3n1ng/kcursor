@@ -212,7 +212,7 @@ pub enum CursorIcon {
 }
 
 impl CursorIcon {
-	pub fn frames(&self, size: u32) -> Option<Vec<Frame>> {
+	pub fn frames(&self, size: u32) -> Option<Vec<Image>> {
 		match self {
 			CursorIcon::Svg { path } => {
 				let metadata = path.join("metadata.json");
@@ -225,7 +225,7 @@ impl CursorIcon {
 
 				let images = metadata
 					.into_iter()
-					.map(|meta| Frame::render_svg(path, size, meta));
+					.map(|meta| Image::render_svg(path, size, meta));
 
 				Some(images.collect())
 			}
@@ -245,7 +245,7 @@ impl CursorIcon {
 				let frames = images
 					.into_iter()
 					.filter(|img| img.size == nearest_size)
-					.map(Frame::from_xcursor)
+					.map(Image::from_xcursor)
 					.collect();
 				Some(frames)
 			}
@@ -253,19 +253,23 @@ impl CursorIcon {
 	}
 }
 
-pub struct Frame {
+pub struct Image {
+	/// size of the image
 	pub size: u32,
 
+	/// x hotspot in scaled pixels
 	pub xhot: u32,
+	// y hotspot in scaled pixels
 	pub yhot: u32,
 
+	/// delay in ms
 	pub delay: Option<u32>,
 
 	/// pixels in rgba format
 	pub pixels: Vec<u8>,
 }
 
-impl Debug for Frame {
+impl Debug for Image {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Frame")
 			.field("size", &self.size)
@@ -277,9 +281,9 @@ impl Debug for Frame {
 	}
 }
 
-impl Frame {
+impl Image {
 	fn from_xcursor(xcursor: xcursor::parser::Image) -> Self {
-		Frame {
+		Image {
 			size: xcursor.size,
 
 			xhot: xcursor.xhot,
@@ -311,7 +315,7 @@ impl Frame {
 
 		let pixels = pixmap.take();
 
-		Frame {
+		Image {
 			size,
 
 			xhot: xhot as u32,
