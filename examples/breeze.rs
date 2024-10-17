@@ -13,7 +13,7 @@ fn main() {
 	let file = File::create("image.png").unwrap();
 	let file = BufWriter::new(file);
 
-	let mut encoder = PngEncoder::new(file, frame.size, frame.size);
+	let mut encoder = PngEncoder::new(file, frame.width, frame.height);
 	encoder.set_color(png::ColorType::Rgba);
 	encoder.set_depth(png::BitDepth::Eight);
 

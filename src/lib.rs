@@ -254,8 +254,12 @@ impl CursorIcon {
 }
 
 pub struct Image {
-	/// size of the image
+	/// the nominal size of the image
 	pub size: u32,
+	/// the actual width of the image
+	pub width: u32,
+	/// the actual height of the image
+	pub height: u32,
 
 	/// x hotspot in scaled pixels
 	pub xhot: u32,
@@ -273,6 +277,8 @@ impl Debug for Image {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 		f.debug_struct("Frame")
 			.field("size", &self.size)
+			.field("height", &self.height)
+			.field("width", &self.width)
 			.field("xhot", &self.xhot)
 			.field("yhot", &self.yhot)
 			.field("delay", &self.delay)
@@ -285,6 +291,8 @@ impl Image {
 	fn from_xcursor(xcursor: xcursor::parser::Image) -> Self {
 		Image {
 			size: xcursor.size,
+			height: xcursor.height,
+			width: xcursor.width,
 
 			xhot: xcursor.xhot,
 			yhot: xcursor.yhot,
@@ -302,28 +310,27 @@ impl Image {
 		let data = std::fs::read(data).unwrap();
 
 		let tree = Tree::from_data(&data, &usvg_opts).unwrap();
-		let transform = Transform::from_scale(
-			size as f32 / tree.size().height(),
-			size as f32 / tree.size().width(),
-		);
 
 		let scale = size as f32 / meta.nominal_size;
-		let (xhot, yhot) = (meta.hotspot_x * scale, meta.hotspot_y * scale);
+		let transform = Transform::from_scale(scale, scale);
 
-		let mut pixmap = Pixmap::new(size, size).unwrap();
+		let width = (tree.size().width() * scale) as u32;
+		let height = (tree.size().height() * scale) as u32;
+
+		let mut pixmap = Pixmap::new(width, height).unwrap();
 		resvg::render(&tree, transform, &mut pixmap.as_mut());
-
-		let pixels = pixmap.take();
 
 		Image {
 			size,
+			width,
+			height,
 
-			xhot: xhot as u32,
-			yhot: yhot as u32,
+			xhot: (meta.hotspot_x * scale) as u32,
+			yhot: (meta.hotspot_y * scale) as u32,
 
 			delay: meta.delay,
 
-			pixels,
+			pixels: pixmap.take(),
 		}
 	}
 }
