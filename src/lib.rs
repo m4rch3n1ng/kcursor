@@ -267,7 +267,9 @@ pub struct Image {
 	pub yhot: u32,
 
 	/// delay in ms
-	pub delay: Option<u32>,
+	///
+	/// 0 when not set
+	pub delay: u32,
 
 	/// pixels in rgba format
 	pub pixels: Vec<u8>,
@@ -297,7 +299,7 @@ impl Image {
 			xhot: xcursor.xhot,
 			yhot: xcursor.yhot,
 
-			delay: Some(xcursor.delay),
+			delay: xcursor.delay,
 
 			pixels: xcursor.pixels_rgba,
 		}
@@ -344,5 +346,5 @@ struct Meta {
 	nominal_size: f32,
 
 	#[serde(default)]
-	delay: Option<u32>,
+	delay: u32,
 }
