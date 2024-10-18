@@ -11,3 +11,7 @@ xcursor = "0.3.8"
 
 [dev-dependencies]
 png = "0.17.14"
+
+[features]
+default = []
+text = ["resvg/text", "resvg/system-fonts", "resvg/memmap-fonts"]
