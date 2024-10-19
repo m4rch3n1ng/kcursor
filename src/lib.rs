@@ -1,5 +1,5 @@
 //! a crate to load cursor themes, that supports both the xcursor format and
-//! the new kde svg cursor format
+//! the new kde svg cursor format.
 
 use resvg::{
 	tiny_skia::Pixmap,
@@ -143,6 +143,7 @@ impl CursorTheme {
 				};
 
 				if resolved.parent() != Some(&directory) {
+					// ignore symlinks that point outside of the directory
 					continue;
 				}
 
@@ -323,6 +324,9 @@ impl Image {
 		}
 	}
 
+	/// render svg cursors to the requested size
+	///
+	/// https://invent.kde.org/plasma/breeze/-/blob/master/cursors/svg-cursor-format.schema.json
 	fn render_svg(path: &Path, size: u32, meta: Meta) -> Self {
 		let usvg_opts = resvg::usvg::Options::default();
 
@@ -355,6 +359,7 @@ impl Image {
 	}
 }
 
+/// schema at https://invent.kde.org/plasma/breeze/-/blob/master/cursors/svg-cursor-format.schema.json
 #[derive(Debug, Deserialize)]
 struct Meta {
 	filename: String,
