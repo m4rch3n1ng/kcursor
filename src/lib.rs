@@ -1,5 +1,5 @@
-// official ref
-// https://invent.kde.org/plasma/kwin/-/blob/master/src/utils/svgcursorreader.cpp?ref_type=heads
+//! a crate to load cursor themes, that supports both the xcursor format and
+//! the new kde svg cursor format
 
 use resvg::{
 	tiny_skia::Pixmap,
@@ -47,12 +47,21 @@ static CURSOR_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
 	user_dirs
 });
 
+/// a cursor theme
+///
+/// a cursor theme is a collection of cursor icons, in either the
+/// [`CursorIcon::Svg`] or the [`CursorIcon::X`] format.
 #[derive(Debug)]
 pub struct CursorTheme {
 	cache: HashMap<OsString, Arc<CursorIcon>>,
 }
 
 impl CursorTheme {
+	/// attempts to load a cursor theme from the given name
+	///
+	/// this function loads all cursor icons into a cache, that
+	/// can be accessed through [`CursorTheme::icon`].
+	/// also searches through all themes this theme inherits from.
 	pub fn load(name: &str) -> Option<Self> {
 		let mut cache = HashMap::new();
 
@@ -143,6 +152,7 @@ impl CursorTheme {
 		}
 	}
 
+	/// try to load an icon from the theme
 	pub fn icon(&self, icon: &str) -> Option<&CursorIcon> {
 		self.cache.get::<OsStr>(icon.as_ref()).map(Arc::as_ref)
 	}
@@ -184,13 +194,36 @@ fn theme_inherits(path: PathBuf) -> Option<String> {
 	None
 }
 
+/// a cursor icon
 #[derive(Debug)]
 pub enum CursorIcon {
-	Svg { path: PathBuf },
-	X { path: PathBuf },
+	/// an svg cursor icon
+	Svg {
+		/// the path to the directory of the svg
+		/// cursor icon
+		path: PathBuf,
+	},
+	/// an xcursor icon
+	X {
+		/// the path to the xcursor file
+		path: PathBuf,
+	},
 }
 
 impl CursorIcon {
+	/// get cursor frames at the requested size
+	///
+	/// - for [`CursorIcon::X`] icons this will return
+	///   the images that closest match the requested size.
+	///   
+	///   uses the [`xcursor`] crate for parsing xcursor files.
+	/// - for [`CursorIcon::Svg`] this will render
+	///   the images at the requested size.
+	///   
+	///   for large images with many frames, this may take
+	///   a few seconds.
+	///   
+	///   uses the [`resvg`] crate for svg rendering.
 	pub fn frames(&self, size: u32) -> Option<Vec<Image>> {
 		match self {
 			CursorIcon::Svg { path } => {
@@ -232,6 +265,7 @@ impl CursorIcon {
 	}
 }
 
+/// a cursor image
 pub struct Image {
 	/// the nominal size of the image
 	pub size: u32,
@@ -242,12 +276,12 @@ pub struct Image {
 
 	/// x hotspot in scaled pixels
 	pub xhot: u32,
-	// y hotspot in scaled pixels
+	/// y hotspot in scaled pixels
 	pub yhot: u32,
 
 	/// delay in ms
 	///
-	/// 0 when not set
+	/// defaults to 0
 	pub delay: u32,
 
 	/// pixels in rgba format
@@ -309,7 +343,7 @@ impl Image {
 			xhot: (meta.hotspot_x * scale) as u32,
 			yhot: (meta.hotspot_y * scale) as u32,
 
-			delay: meta.delay,
+			delay: meta.delay.unwrap_or(0),
 
 			pixels: pixmap.take(),
 		}
@@ -325,5 +359,5 @@ struct Meta {
 	nominal_size: f32,
 
 	#[serde(default)]
-	delay: u32,
+	delay: Option<u32>,
 }
