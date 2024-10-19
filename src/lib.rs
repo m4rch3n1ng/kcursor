@@ -138,11 +138,16 @@ impl CursorTheme {
 
 			if entry.metadata().unwrap().is_symlink() {
 				let symlink = entry.path();
-				let target = std::fs::read_link(&symlink).unwrap();
+				let Ok(resolved) = std::fs::canonicalize(&symlink) else {
+					continue;
+				};
 
-				assert_eq!(target.file_name(), Some(target.as_os_str()));
+				if resolved.parent() != Some(&directory) {
+					continue;
+				}
 
-				if let Some(target) = cache.get(target.as_os_str()) {
+				let alias = resolved.file_name().unwrap();
+				if let Some(target) = cache.get(alias) {
 					cache.insert(shape, target.clone());
 				}
 			} else {
