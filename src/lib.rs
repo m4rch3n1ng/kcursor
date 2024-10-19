@@ -100,36 +100,20 @@ impl CursorTheme {
 	}
 
 	fn discover_svg_cursors(directory: PathBuf, cache: &mut HashMap<OsString, Arc<CursorIcon>>) {
-		let (entries, symlinks) = directory
-			.read_dir()
-			.unwrap()
-			.filter_map(Result::ok)
-			.filter(|entry| entry.metadata().is_ok())
-			.partition::<Vec<_>, _>(|entry| !entry.metadata().unwrap().is_symlink());
-
-		for entry in entries.into_iter().chain(symlinks.into_iter()) {
-			let shape = entry.file_name();
-			if cache.contains_key(&shape) {
-				continue;
-			}
-
-			if entry.metadata().unwrap().is_symlink() {
-				let symlink = entry.path();
-				let target = std::fs::read_link(&symlink).unwrap();
-
-				assert_eq!(target.file_name(), Some(target.as_os_str()));
-
-				if let Some(target) = cache.get(target.as_os_str()) {
-					cache.insert(shape, target.clone());
-				}
-			} else {
-				let path = entry.path();
-				cache.insert(shape, Arc::new(CursorIcon::Svg { path }));
-			}
-		}
+		CursorTheme::discover_cursors(directory, cache, |path| CursorIcon::Svg { path });
 	}
 
 	fn discover_x_cursors(directory: PathBuf, cache: &mut HashMap<OsString, Arc<CursorIcon>>) {
+		CursorTheme::discover_cursors(directory, cache, |path| CursorIcon::X { path });
+	}
+
+	fn discover_cursors<F>(
+		directory: PathBuf,
+		cache: &mut HashMap<OsString, Arc<CursorIcon>>,
+		fun: F,
+	) where
+		F: Fn(PathBuf) -> CursorIcon,
+	{
 		let (entries, symlinks): (Vec<_>, Vec<_>) = directory
 			.read_dir()
 			.unwrap()
@@ -154,7 +138,7 @@ impl CursorTheme {
 				}
 			} else {
 				let path = entry.path();
-				cache.insert(shape, Arc::new(CursorIcon::X { path }));
+				cache.insert(shape, Arc::new(fun(path)));
 			}
 		}
 	}
