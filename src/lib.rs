@@ -9,6 +9,7 @@ use serde::Deserialize;
 use std::{
 	borrow::Cow,
 	collections::HashMap,
+	ffi::{OsStr, OsString},
 	fmt::Debug,
 	path::{Path, PathBuf},
 	sync::{Arc, LazyLock},
@@ -48,7 +49,7 @@ static CURSOR_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
 
 #[derive(Debug)]
 pub struct CursorTheme {
-	cache: HashMap<String, Arc<CursorIcon>>,
+	cache: HashMap<OsString, Arc<CursorIcon>>,
 }
 
 impl CursorTheme {
@@ -64,7 +65,7 @@ impl CursorTheme {
 		}
 	}
 
-	fn discover(icon: &str, cache: &mut HashMap<String, Arc<CursorIcon>>) {
+	fn discover(icon: &str, cache: &mut HashMap<OsString, Arc<CursorIcon>>) {
 		let mut stack = vec![Cow::Borrowed(icon)];
 
 		while let Some(name) = stack.pop() {
@@ -98,7 +99,7 @@ impl CursorTheme {
 		}
 	}
 
-	fn discover_svg_cursors(directory: PathBuf, cache: &mut HashMap<String, Arc<CursorIcon>>) {
+	fn discover_svg_cursors(directory: PathBuf, cache: &mut HashMap<OsString, Arc<CursorIcon>>) {
 		let (entries, symlinks) = directory
 			.read_dir()
 			.unwrap()
@@ -108,8 +109,6 @@ impl CursorTheme {
 
 		for entry in entries.into_iter().chain(symlinks.into_iter()) {
 			let shape = entry.file_name();
-			let shape = shape.into_string().unwrap();
-
 			if cache.contains_key(&shape) {
 				continue;
 			}
@@ -119,9 +118,8 @@ impl CursorTheme {
 				let target = std::fs::read_link(&symlink).unwrap();
 
 				assert_eq!(target.file_name(), Some(target.as_os_str()));
-				let target = target.into_os_string().into_string().unwrap();
 
-				if let Some(target) = cache.get(&target) {
+				if let Some(target) = cache.get(target.as_os_str()) {
 					cache.insert(shape, target.clone());
 				}
 			} else {
@@ -131,7 +129,7 @@ impl CursorTheme {
 		}
 	}
 
-	fn discover_x_cursors(directory: PathBuf, cache: &mut HashMap<String, Arc<CursorIcon>>) {
+	fn discover_x_cursors(directory: PathBuf, cache: &mut HashMap<OsString, Arc<CursorIcon>>) {
 		let (entries, symlinks): (Vec<_>, Vec<_>) = directory
 			.read_dir()
 			.unwrap()
@@ -141,8 +139,6 @@ impl CursorTheme {
 
 		for entry in entries.into_iter().chain(symlinks) {
 			let shape = entry.file_name();
-			let shape = shape.into_string().unwrap();
-
 			if cache.contains_key(&shape) {
 				continue;
 			}
@@ -152,9 +148,8 @@ impl CursorTheme {
 				let target = std::fs::read_link(&symlink).unwrap();
 
 				assert_eq!(target.file_name(), Some(target.as_os_str()));
-				let target = target.into_os_string().into_string().unwrap();
 
-				if let Some(target) = cache.get(&target) {
+				if let Some(target) = cache.get(target.as_os_str()) {
 					cache.insert(shape, target.clone());
 				}
 			} else {
@@ -165,7 +160,7 @@ impl CursorTheme {
 	}
 
 	pub fn icon(&self, icon: &str) -> Option<&CursorIcon> {
-		self.cache.get(icon).map(Arc::as_ref)
+		self.cache.get::<OsStr>(icon.as_ref()).map(Arc::as_ref)
 	}
 }
 
