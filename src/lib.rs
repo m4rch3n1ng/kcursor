@@ -123,20 +123,21 @@ impl CursorTheme {
 	) where
 		F: Fn(PathBuf) -> CursorIcon,
 	{
-		let (entries, symlinks): (Vec<_>, Vec<_>) = directory
-			.read_dir()
-			.unwrap()
+		let Ok(read_dir) = directory.read_dir() else {
+			return;
+		};
+		let (entries, symlinks): (Vec<_>, Vec<_>) = read_dir
 			.filter_map(Result::ok)
-			.filter(|entry| entry.metadata().is_ok())
-			.partition(|entry| !entry.metadata().unwrap().is_symlink());
+			.filter_map(|entry| entry.metadata().ok().map(|meta| (entry, meta)))
+			.partition(|(_, meta)| !meta.is_symlink());
 
-		for entry in entries.into_iter().chain(symlinks) {
+		for (entry, meta) in entries.into_iter().chain(symlinks) {
 			let shape = entry.file_name();
 			if cache.contains_key(&shape) {
 				continue;
 			}
 
-			if entry.metadata().unwrap().is_symlink() {
+			if meta.is_symlink() {
 				let symlink = entry.path();
 				let Ok(resolved) = std::fs::canonicalize(&symlink) else {
 					continue;
@@ -245,19 +246,15 @@ impl CursorIcon {
 					.into_iter()
 					.map(|meta| Image::render_svg(path, size, meta));
 
-				Some(images.collect())
+				images.collect()
 			}
 			CursorIcon::X { path } => {
 				let content = std::fs::read(path).ok()?;
 				let images = xcursor::parser::parse_xcursor(&content)?;
-				if images.is_empty() {
-					return None;
-				}
 
 				let nearest = images
 					.iter()
-					.min_by_key(|img| u32::abs_diff(img.size, size))
-					.unwrap();
+					.min_by_key(|img| u32::abs_diff(img.size, size))?;
 				let nearest_size = nearest.size;
 
 				let frames = images
@@ -327,13 +324,13 @@ impl Image {
 	/// render svg cursors to the requested size
 	///
 	/// https://invent.kde.org/plasma/breeze/-/blob/master/cursors/svg-cursor-format.schema.json
-	fn render_svg(path: &Path, size: u32, meta: Meta) -> Self {
+	fn render_svg(path: &Path, size: u32, meta: Meta) -> Option<Self> {
 		let usvg_opts = resvg::usvg::Options::default();
 
 		let data = path.join(meta.filename);
-		let data = std::fs::read(data).unwrap();
+		let data = std::fs::read(data).ok()?;
 
-		let tree = Tree::from_data(&data, &usvg_opts).unwrap();
+		let tree = Tree::from_data(&data, &usvg_opts).ok()?;
 
 		let scale = size as f32 / meta.nominal_size;
 		let transform = Transform::from_scale(scale, scale);
@@ -341,10 +338,10 @@ impl Image {
 		let width = (tree.size().width() * scale) as u32;
 		let height = (tree.size().height() * scale) as u32;
 
-		let mut pixmap = Pixmap::new(width, height).unwrap();
+		let mut pixmap = Pixmap::new(width, height)?;
 		resvg::render(&tree, transform, &mut pixmap.as_mut());
 
-		Image {
+		let image = Image {
 			size,
 			width,
 			height,
@@ -355,7 +352,8 @@ impl Image {
 			delay: meta.delay.unwrap_or(0),
 
 			pixels: pixmap.take(),
-		}
+		};
+		Some(image)
 	}
 }
 
