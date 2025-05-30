@@ -53,7 +53,7 @@ static CURSOR_DIRS: LazyLock<Vec<PathBuf>> = LazyLock::new(|| {
 /// [`CursorIcon::Svg`] or the [`CursorIcon::X`] format.
 #[derive(Debug)]
 pub struct CursorTheme {
-	cache: HashMap<OsString, Arc<CursorIcon>>,
+	cache: HashMap<OsString, Arc<Cursor>>,
 }
 
 impl CursorTheme {
@@ -64,7 +64,6 @@ impl CursorTheme {
 	/// also searches through all themes this theme inherits from.
 	pub fn load(name: &str) -> Option<Self> {
 		let mut cache = HashMap::new();
-
 		CursorTheme::discover(name, &mut cache);
 
 		if cache.is_empty() {
@@ -74,7 +73,7 @@ impl CursorTheme {
 		}
 	}
 
-	fn discover(icon: &str, cache: &mut HashMap<OsString, Arc<CursorIcon>>) {
+	fn discover(icon: &str, cache: &mut HashMap<OsString, Arc<Cursor>>) {
 		let mut stack = vec![Cow::Borrowed(icon)];
 
 		while let Some(name) = stack.pop() {
@@ -108,20 +107,17 @@ impl CursorTheme {
 		}
 	}
 
-	fn discover_svg_cursors(directory: PathBuf, cache: &mut HashMap<OsString, Arc<CursorIcon>>) {
-		CursorTheme::discover_cursors(directory, cache, |path| CursorIcon::Svg { path });
+	fn discover_svg_cursors(directory: PathBuf, cache: &mut HashMap<OsString, Arc<Cursor>>) {
+		CursorTheme::discover_cursors(directory, cache, |path| Cursor::Svg { path });
 	}
 
-	fn discover_x_cursors(directory: PathBuf, cache: &mut HashMap<OsString, Arc<CursorIcon>>) {
-		CursorTheme::discover_cursors(directory, cache, |path| CursorIcon::X { path });
+	fn discover_x_cursors(directory: PathBuf, cache: &mut HashMap<OsString, Arc<Cursor>>) {
+		CursorTheme::discover_cursors(directory, cache, |path| Cursor::X { path });
 	}
 
-	fn discover_cursors<F>(
-		directory: PathBuf,
-		cache: &mut HashMap<OsString, Arc<CursorIcon>>,
-		fun: F,
-	) where
-		F: Fn(PathBuf) -> CursorIcon,
+	fn discover_cursors<F>(directory: PathBuf, cache: &mut HashMap<OsString, Arc<Cursor>>, fun: F)
+	where
+		F: Fn(PathBuf) -> Cursor,
 	{
 		let Ok(read_dir) = directory.read_dir() else {
 			return;
@@ -160,7 +156,7 @@ impl CursorTheme {
 	}
 
 	/// try to load an icon from the theme
-	pub fn icon(&self, icon: &str) -> Option<&CursorIcon> {
+	pub fn icon(&self, icon: &str) -> Option<&Cursor> {
 		self.cache.get::<OsStr>(icon.as_ref()).map(Arc::as_ref)
 	}
 }
@@ -203,7 +199,7 @@ fn theme_inherits(path: PathBuf) -> Option<String> {
 
 /// a cursor icon
 #[derive(Debug)]
-pub enum CursorIcon {
+pub enum Cursor {
 	/// an svg cursor icon
 	Svg {
 		/// the path to the directory of the svg
@@ -217,7 +213,7 @@ pub enum CursorIcon {
 	},
 }
 
-impl CursorIcon {
+impl Cursor {
 	/// get cursor frames at the requested size
 	///
 	/// - for [`CursorIcon::X`] icons this will return
@@ -233,7 +229,7 @@ impl CursorIcon {
 	///   uses the [`resvg`] crate for svg rendering.
 	pub fn frames(&self, size: u32) -> Option<Vec<Image>> {
 		match self {
-			CursorIcon::Svg { path } => {
+			Cursor::Svg { path } => {
 				let metadata = path.join("metadata.json");
 				let metadata = std::fs::read_to_string(metadata).ok()?;
 				let metadata = serde_json::from_str::<Vec<Meta>>(&metadata).ok()?;
@@ -242,13 +238,12 @@ impl CursorIcon {
 					return None;
 				}
 
-				let images = metadata
+				metadata
 					.into_iter()
-					.map(|meta| Image::render_svg(path, size, meta));
-
-				images.collect()
+					.map(|meta| Image::render_svg(path, size, meta))
+					.collect()
 			}
-			CursorIcon::X { path } => {
+			Cursor::X { path } => {
 				let content = std::fs::read(path).ok()?;
 				let images = xcursor::parser::parse_xcursor(&content)?;
 
