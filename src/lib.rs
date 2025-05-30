@@ -156,8 +156,8 @@ impl CursorTheme {
 	}
 
 	/// try to load an icon from the theme
-	pub fn icon(&self, icon: &str) -> Option<&Cursor> {
-		self.cache.get::<OsStr>(icon.as_ref()).map(Arc::as_ref)
+	pub fn icon<A: AsRef<OsStr>>(&self, icon: A) -> Option<&Cursor> {
+		self.cache.get(icon.as_ref()).map(Arc::as_ref)
 	}
 }
 
