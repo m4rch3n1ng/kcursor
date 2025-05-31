@@ -1,10 +1,11 @@
+use cursor_icon::CursorIcon;
 use kcursor::CursorTheme;
 use png::Encoder as PngEncoder;
 use std::{fs::File, io::BufWriter};
 
 fn main() {
 	let theme = CursorTheme::load("Breeze_Light").unwrap();
-	let icon = theme.icon("wait").unwrap();
+	let icon = theme.icon(CursorIcon::Wait).unwrap();
 
 	let size = 48;
 	let frames = icon.frames(size).unwrap();

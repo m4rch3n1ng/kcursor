@@ -6,6 +6,7 @@ readme = "readme.md"
 repository = "https://github.com/m4rch3n1ng/kcursor"
 
 [dependencies]
+cursor-icon = "1.2.0"
 resvg = { version = "0.44.0", default-features = false }
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"

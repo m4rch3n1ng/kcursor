@@ -1,6 +1,7 @@
 //! a crate to load cursor themes, that supports both the xcursor format and
 //! the new kde svg cursor format.
 
+use cursor_icon::CursorIcon;
 use resvg::{
 	tiny_skia::Pixmap,
 	usvg::{Transform, Tree},
@@ -155,8 +156,16 @@ impl CursorTheme {
 		}
 	}
 
+	pub fn icon(&self, icon: CursorIcon) -> Option<&Cursor> {
+		self.icon_name(icon.name()).or_else(|| {
+			icon.alt_names()
+				.iter()
+				.find_map(|icon| self.icon_name(icon))
+		})
+	}
+
 	/// try to load an icon from the theme
-	pub fn icon<A: AsRef<OsStr>>(&self, icon: A) -> Option<&Cursor> {
+	pub fn icon_name<A: AsRef<OsStr>>(&self, icon: A) -> Option<&Cursor> {
 		self.cache.get(icon.as_ref()).map(Arc::as_ref)
 	}
 }
